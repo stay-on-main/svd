@@ -42,7 +42,7 @@ fn fields_get(mut field: Element) -> Field
         bit_width: field.take_child("bitWidth").unwrap().text.unwrap(),
     };
 
-    println!("Field: {}", f.name);
+    //println!("Field: {}", f.name);
 
     f
 }
@@ -59,7 +59,7 @@ fn registers_get(mut register: Element) -> Register
         fields: Vec::new(),
     };
 
-    println!("Register: {}", r.name);
+    //println!("Register: {}", r.name);
 
     match register.take_child("fields") {
         Some(mut fields) => {
@@ -75,33 +75,61 @@ fn registers_get(mut register: Element) -> Register
         None => { },
     };
 
-    /*
-    let mut fields = register.take_child("fields").expect("Can't find name element");
-
-    loop {
-        match fields.take_child("field") {
-            Some(field) => {
-                r.fields.push(fields_get(field));
-            },
-            None => { break },
-        }
-    }
-    */
-    
     r
 }
 
+fn name_from_file(word: &String) -> String {
+    let (first, last) = word.split_at(1);
+    first.to_string() + last.to_string().to_lowercase().as_str()
+}
 
 fn generate(p: &Perepheral) {
-    let path = p.name.clone() + ".rs";
+    let path = p.name.to_lowercase() + ".rs";
     let mut file = File::create(path).unwrap();
 
     for r in &p.registers {
-        //file.write_all(b"");
-        write!(&mut file, "reg {}", r.name);
+        writeln!(&mut file, "pub struct {} {{", name_from_file(&r.name)).unwrap();
+        writeln!(&mut file, "   raw: u32,").unwrap();
+        writeln!(&mut file, "}}").unwrap();
+        writeln!(&mut file, "").unwrap();
+        
+        if r.fields.len() > 0 {
+            writeln!(&mut file, "impl {} {{", name_from_file(&r.name)).unwrap();
+
+            for f in &r.fields {
+                writeln!(&mut file, "    #[inline(always)]").unwrap();
+                writeln!(&mut file, "    pub fn {}_get(&self) -> u32 {{", f.name.to_lowercase()).unwrap();
+                writeln!(&mut file, "        (self.raw >> {}) & ((1 << {}) - 1)", f.bit_offset, f.bit_width).unwrap();
+                writeln!(&mut file, "    }}", ).unwrap();
+                writeln!(&mut file, "", ).unwrap();
+
+                writeln!(&mut file, "    #[inline(always)]").unwrap();
+                writeln!(&mut file, "    pub fn {}_set(&mut self, val: u32) {{", f.name.to_lowercase()).unwrap();
+                writeln!(&mut file, "        self.raw = (self.raw & !(((1 << {}) - 1) << {})) | ((val & ((1 << {}) - 1)) << {})", f.bit_width, f.bit_offset, f.bit_width, f.bit_offset).unwrap();
+                writeln!(&mut file, "    }}", ).unwrap();
+                writeln!(&mut file, "", ).unwrap();
+            }
+
+            writeln!(&mut file, "}}").unwrap();
+            writeln!(&mut file, "").unwrap();
+        } 
+
+        writeln!(&mut file, "pub mod {} {{", r.name.to_lowercase()).unwrap();
+        writeln!(&mut file, "    #[inline(always)]").unwrap();
+        writeln!(&mut file, "    pub fn read() -> super::{} {{", name_from_file(&r.name)).unwrap();
+        writeln!(&mut file, "        super::{} {{", name_from_file(&r.name)).unwrap();
+        writeln!(&mut file, "            raw: unsafe {{ *(({} + {}) as *const u32) }}", p.base_address, r.address_offset).unwrap();
+        writeln!(&mut file, "        }}").unwrap();
+        writeln!(&mut file, "    }}").unwrap();
+        writeln!(&mut file, "").unwrap();
+        writeln!(&mut file, "    #[inline(always)]").unwrap();
+        writeln!(&mut file, "    pub fn write(val: & super::{}) {{", name_from_file(&r.name)).unwrap();
+        writeln!(&mut file, "       unsafe {{ *(({} + {}) as *mut u32) = val.raw; }}", p.base_address, r.address_offset).unwrap();
+        writeln!(&mut file, "    }}").unwrap();
+        writeln!(&mut file, "}}").unwrap();
+        writeln!(&mut file, "").unwrap();
     }
 }
-
 
 fn peripheral_get(mut peripheral: Element) -> Perepheral
 {
@@ -113,7 +141,6 @@ fn peripheral_get(mut peripheral: Element) -> Perepheral
         registers: Vec::new(),
     };
 
-    
     println!("Perepheral: {}", p.name);
 
     let mut registers = peripheral.take_child("registers").expect("Can't find name element");
@@ -127,13 +154,12 @@ fn peripheral_get(mut peripheral: Element) -> Perepheral
         }
     }
 
-    generate(&p);
     p
 }
 
 
 fn main() {
-    let mut file = File::open("C:/stay-on-main/svd/STM32F103.svd").unwrap();
+    let mut file = File::open("D:/stay-on-main/svd/STM32F103.svd").unwrap();
     let mut contents = vec![];
     file.read_to_end(&mut contents).unwrap();
 
@@ -150,13 +176,14 @@ fn main() {
 
                 for (attribute, value) in &peripheral.attributes {
                     if *attribute == "derivedFrom".to_string() {
-                        println!("derivedFrom: {}", value);
+                        //print!("derivedFrom: {}, ", value);
                         
                         for p in &ph {
                             if &p.name == value {
                                 let mut new_peripheral = p.clone();
-                                new_peripheral.name = value.clone();
+                                new_peripheral.name = peripheral.take_child("name").unwrap().text.unwrap();
                                 new_peripheral.base_address = peripheral.take_child("baseAddress").unwrap().text.unwrap();
+                                println!("Peripheral: {}, derivedFrom: {}", new_peripheral.name, &p.name);
                                 ph.push(new_peripheral);
                                 break;
                             }
@@ -173,6 +200,10 @@ fn main() {
             },
             None => { break },
         }
+    }
+
+    for p in ph {
+        generate(&p);
     }
 }
 
