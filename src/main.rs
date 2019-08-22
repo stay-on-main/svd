@@ -104,11 +104,17 @@ fn generate(p: &Perepheral) {
                 writeln!(&mut file, "", ).unwrap();
 
                 writeln!(&mut file, "    #[inline(always)]").unwrap();
-                writeln!(&mut file, "    pub fn {}_set(&mut self, val: u32) {{", f.name.to_lowercase()).unwrap();
-                writeln!(&mut file, "        self.raw = (self.raw & !(((1 << {}) - 1) << {})) | ((val & ((1 << {}) - 1)) << {})", f.bit_width, f.bit_offset, f.bit_width, f.bit_offset).unwrap();
+                writeln!(&mut file, "    pub fn {}(mut self, val: u32) -> {} {{", f.name.to_lowercase(), name_from_file(&r.name)).unwrap();
+                writeln!(&mut file, "        self.raw = (self.raw & !(((1 << {}) - 1) << {})) | ((val & ((1 << {}) - 1)) << {});", f.bit_width, f.bit_offset, f.bit_width, f.bit_offset).unwrap();
+                writeln!(&mut file, "        self", ).unwrap();    
                 writeln!(&mut file, "    }}", ).unwrap();
                 writeln!(&mut file, "", ).unwrap();
             }
+
+            writeln!(&mut file, "    #[inline(always)]").unwrap();
+            writeln!(&mut file, "    pub fn write(self) {{").unwrap();
+            writeln!(&mut file, "       unsafe {{ *(({} + {}) as *mut u32) = self.raw; }}", p.base_address, r.address_offset).unwrap();
+            writeln!(&mut file, "    }}").unwrap();
 
             writeln!(&mut file, "}}").unwrap();
             writeln!(&mut file, "").unwrap();
