@@ -113,7 +113,7 @@ fn generate(p: &Perepheral) {
 
             writeln!(&mut file, "    #[inline(always)]").unwrap();
             writeln!(&mut file, "    pub fn write(self) {{").unwrap();
-            writeln!(&mut file, "       unsafe {{ *(({} + {}) as *mut u32) = self.raw; }}", p.base_address, r.address_offset).unwrap();
+            writeln!(&mut file, "       unsafe {{ *(({}u32 + {}u32) as *mut u32) = self.raw; }}", p.base_address, r.address_offset).unwrap();
             writeln!(&mut file, "    }}").unwrap();
 
             writeln!(&mut file, "}}").unwrap();
@@ -124,13 +124,13 @@ fn generate(p: &Perepheral) {
         writeln!(&mut file, "    #[inline(always)]").unwrap();
         writeln!(&mut file, "    pub fn read() -> super::{} {{", name_from_file(&r.name)).unwrap();
         writeln!(&mut file, "        super::{} {{", name_from_file(&r.name)).unwrap();
-        writeln!(&mut file, "            raw: unsafe {{ *(({} + {}) as *const u32) }}", p.base_address, r.address_offset).unwrap();
+        writeln!(&mut file, "            raw: unsafe {{ *(({}u32 + {}u32) as *const u32) }}", p.base_address, r.address_offset).unwrap();
         writeln!(&mut file, "        }}").unwrap();
         writeln!(&mut file, "    }}").unwrap();
         writeln!(&mut file, "").unwrap();
         writeln!(&mut file, "    #[inline(always)]").unwrap();
         writeln!(&mut file, "    pub fn write(val: & super::{}) {{", name_from_file(&r.name)).unwrap();
-        writeln!(&mut file, "       unsafe {{ *(({} + {}) as *mut u32) = val.raw; }}", p.base_address, r.address_offset).unwrap();
+        writeln!(&mut file, "       unsafe {{ *(({}u32 + {}u32) as *mut u32) = val.raw; }}", p.base_address, r.address_offset).unwrap();
         writeln!(&mut file, "    }}").unwrap();
         writeln!(&mut file, "}}").unwrap();
         writeln!(&mut file, "").unwrap();
@@ -165,7 +165,7 @@ fn peripheral_get(mut peripheral: Element) -> Perepheral
 
 
 fn main() {
-    let mut file = File::open("D:/stay-on-main/svd/STM32F103.svd").unwrap();
+    let mut file = File::open("C:/stay-on-main/svd/STM32F103.svd").unwrap();
     let mut contents = vec![];
     file.read_to_end(&mut contents).unwrap();
 
