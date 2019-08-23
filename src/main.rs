@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::prelude::*;
-use xmltree::Element;
-
+//use xmltree::Element;
+/*
 #[derive(Clone)]
 struct Field
 {
@@ -211,4 +211,70 @@ fn main() {
     for p in ph {
         generate(&p);
     }
+}
+*/
+
+extern crate svd_parser as svd;
+
+//use std::fs::File;
+use std::io::Read;
+
+fn get_methods(access: Option<svd::Access>) -> (bool, bool) {
+    let mut r = true;
+    let mut w = true;
+
+    if let Some(access) = access {
+        match access {
+            svd::Access::ReadOnly => { w = false; },
+            svd::Access::ReadWrite => { },
+            svd::Access::ReadWriteOnce => { },
+            svd::Access::WriteOnce => { r = false; },
+            svd::Access::WriteOnly => { r = false; },
+        }
+    }
+    (r, w)
+}
+
+fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
+    for p in peripheral {
+        println!("Peripheral name: {}", p.name);
+
+        let path = p.name.to_lowercase() + ".rs";
+        let mut file = File::create(path).unwrap();
+
+        if let Some(registers) = &p.registers {
+            for reg in registers {
+                if let svd::RegisterCluster::Register(r) = reg {
+                    writeln!(&mut file, "pub mod {} {{", r.name.to_lowercase()).unwrap();
+                    
+                    if let Some(fields) = &r.fields {
+                        for f in fields {
+                            let (r, w) = get_methods(f.access);
+                            
+                            if r == true {
+                                writeln!(&mut file, "    fn {}_get() -> u32 {{}}", f.name.to_lowercase()).unwrap();
+                            }
+
+                            if w == true {
+                                writeln!(&mut file, "    fn {}_set(val: u32) {{}}", f.name.to_lowercase()).unwrap();
+                            }
+                        }
+                    }
+
+                    writeln!(&mut file, "}}").unwrap();
+                    writeln!(&mut file, "").unwrap();
+                }
+            }
+        }
+    }
+}
+
+fn main() {
+    let xml = &mut String::new();
+    File::open("D:/stay-on-main/svd/STM32F103.svd").unwrap().read_to_string(xml);
+
+    let f = svd::parse(xml).unwrap();
+    generate(&f.peripherals);
+    println!("name: {}", f.name);
+
 }
