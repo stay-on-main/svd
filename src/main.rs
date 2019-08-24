@@ -249,15 +249,25 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
                     
                     if let Some(fields) = &r.fields {
                         for f in fields {
-                            let (r, w) = get_methods(f.access);
+                            writeln!(&mut file, "    pub mod {} {{", f.name.to_lowercase()).unwrap();
                             
-                            if r == true {
-                                writeln!(&mut file, "    fn {}_get() -> u32 {{}}", f.name.to_lowercase()).unwrap();
+                            let (rd, wr) = get_methods(f.access);
+                            
+                            let reg_addr = p.base_address + r.address_offset;
+
+                            if rd == true {
+                                writeln!(&mut file, "        pub fn get() -> u32 {{").unwrap();
+                                writeln!(&mut file, "            unsafe {{").unwrap();
+                                writeln!(&mut file, "                core::ptr::read_volatile(0x{:x}u32 as *const u32) >> {}", reg_addr, f.bit_range.offset).unwrap();
+                                writeln!(&mut file, "            }}").unwrap();
+                                writeln!(&mut file, "        }}").unwrap();
                             }
 
-                            if w == true {
-                                writeln!(&mut file, "    fn {}_set(val: u32) {{}}", f.name.to_lowercase()).unwrap();
+                            if wr == true {
+                                writeln!(&mut file, "        pub fn set(val: u32) {{}}").unwrap();
                             }
+
+                            writeln!(&mut file, "    }}").unwrap();
                         }
                     }
 
