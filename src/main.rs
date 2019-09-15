@@ -20,6 +20,57 @@ fn get_methods(access: Option<svd::Access>) -> (bool, bool) {
     (r, w)
 }
 
+fn generate_startup_file(intterupts_list: &Vec<svd::interrupt::Interrupt>)
+{
+    let mut max_interrupt_number = 0u32;
+
+    for intterupt in intterupts_list {
+        if intterupt.value > max_interrupt_number {
+            max_interrupt_number = intterupt.value;
+        }
+    }
+
+    let mut content = String::new();
+
+    content          += "#[link_section = \".reset_handler\"]";
+    content          += "#[used]";
+    content += (format!("static RESET_HANDLER: [extern \"C\" fn(); {}] = [", max_interrupt_number + 15)).as_str();
+    content          += "    reset, // Reset 1";     // 1 Reset
+    content          += "    hardfault, // NMI 2"; // 2 NMI
+    content          += "    hardfault, // HardFault 3"; // 3 HardFault
+    content          += "    reserved, // reserved 4"; // 4 reserved
+    content          += "    reserved, // reserved 5"; // 5 reserved
+    content          += "    reserved, // reserved 6"; // 6 reserved
+    content          += "    reserved, // reserved 7"; // 7 reserved
+    content          += "    reserved, // reserved 8"; // 8 reserved
+    content          += "    reserved, // reserved 9"; // 9 reserved
+    content          += "    reserved, // reserved 10"; // 10 reserved
+    content          += "    hardfault, // SVCall 11"; // 11 SVCall
+    content          += "    reserved, // reserved 11"; // 12 reserved
+    content          += "    reserved, // reserved 13"; // 13 reserved
+    content          += "    hardfault, // PendSV 14"; // 14 PendSV
+    content          += "    hardfault, // SysTick 15"; // 15 SysTick, if implemented
+
+    for i in 0..max_interrupt_number {
+        let mut not_found = true;
+
+        for intterupt in intterupts_list {
+            if intterupt.value == i {
+                content += (format!("    hardfault, // {} {}", intterupt.name, intterupt.value)).as_str();
+                not_found = false;
+                break;
+            }
+        }
+
+        if not_found == true {
+            content += (format!("    reserved, // {}", i)).as_str();
+        }
+    }
+
+    let mut file = File::create("startup.rs").unwrap();
+    file.write(content.as_bytes()).unwrap();
+}
+
 fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
     let mut intterupts_list: Vec<svd::interrupt::Interrupt> = Vec::new();
 
@@ -113,31 +164,7 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
         file.write(content.as_bytes()).unwrap();
     }
 
-    let mut file = File::create("startup.rs").unwrap();
-
-    let mut max_interrupt_number = 0u32;
-
-    for intterupt in &intterupts_list {
-        if intterupt.value > max_interrupt_number {
-            max_interrupt_number = intterupt.value;
-        }
-    }
-
-    for i in 0..max_interrupt_number {
-        let mut not_found = true;
-
-        for intterupt in &intterupts_list {
-            if intterupt.value == i {
-                writeln!(&mut file, "    {} {}", intterupt.name, intterupt.value).unwrap();
-                not_found = false;
-                break;
-            }
-        }
-
-        if not_found == true {
-            writeln!(&mut file, "    - {}", i).unwrap();
-        }
-    }
+    generate_startup_file(&intterupts_list);
 }
 
 fn main() {
