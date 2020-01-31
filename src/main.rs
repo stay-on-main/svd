@@ -137,7 +137,7 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
                                 content +=          "            unsafe {\r\n";
 
                                 content += (format!("                let mut reg = core::ptr::read_volatile(0x{:X}u32 as *const u32);\r\n", reg_addr)).as_str();
-                                content += (format!("                reg &= 0x{:X}u32;\r\n", !mask)).as_str();
+                                content += (format!("                reg &= 0x{:X}u32;\r\n", !(mask << f.bit_range.offset))).as_str();
 
                                 if f.bit_range.offset == 0 {
                                     content += (format!("                reg |= val & 0x{:X};\r\n", mask)).as_str();
