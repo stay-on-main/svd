@@ -101,6 +101,7 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
             for reg in registers {
                 if let svd::RegisterCluster::Register(r) = reg {
                     let reg_name = r.name.to_lowercase();
+                    let (reg_rd, reg_wr) = get_methods(r.access);
                     content += (format!("pub mod {} {{\r\n", reg_name)).as_str();
 
                     if let Some(fields) = &r.fields {
@@ -108,11 +109,11 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
                             let field_name = f.name.to_lowercase();
                             content += (format!("    pub mod {} {{\r\n", field_name)).as_str();
                             
-                            let (rd, wr) = get_methods(f.access);
+                            //let (frd, fwr) = get_methods(f.access);
                             let reg_addr = p.base_address + r.address_offset;
                             let mask = ((1u64 << f.bit_range.width) - 1) as u32;
 
-                            if rd == true {
+                            if reg_rd == true {
                                 // GET
                                 content +=          "        pub fn get() -> u32 {\r\n";
                                 content +=          "            unsafe {\r\n";
@@ -131,7 +132,7 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
                                 content +=          "        }\r\n\r\n";
                             }
 
-                            if wr == true {
+                            if reg_wr == true && reg_rd == true {
                                 // SET
                                 content +=          "        pub fn set(val: u32) {\r\n";
                                 content +=          "            unsafe {\r\n";
@@ -143,6 +144,22 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
                                     content += (format!("                reg |= val & 0x{:X};\r\n", mask)).as_str();
                                 } else {
                                     content += (format!("                reg |= (val & 0x{:X}) << {};\r\n", mask, f.bit_range.offset)).as_str();
+                                }
+
+                                content += (format!("                core::ptr::write_volatile(0x{:X}u32 as *mut u32, reg);\r\n", reg_addr)).as_str();
+                                content +=          "            }\r\n";
+                                content +=          "        }\r\n";
+                            }
+
+                            if reg_wr == true && reg_rd == false {
+                                // SET
+                                content +=          "        pub fn set(val: u32) {\r\n";
+                                content +=          "            unsafe {\r\n";
+
+                                if f.bit_range.offset == 0 {
+                                    content += (format!("                let reg = val & 0x{:X};\r\n", mask)).as_str();
+                                } else {
+                                    content += (format!("                let reg = (val & 0x{:X}) << {};\r\n", mask, f.bit_range.offset)).as_str();
                                 }
 
                                 content += (format!("                core::ptr::write_volatile(0x{:X}u32 as *mut u32, reg);\r\n", reg_addr)).as_str();
@@ -169,7 +186,7 @@ fn generate(peripheral: &Vec<svd::peripheral::Peripheral>) {
 
 fn main() {
     let xml = &mut String::new();
-    File::open("C:/stay-on-main/svd/STM32F103.svd").unwrap().read_to_string(xml).unwrap();
+    File::open("D:/stay-on-main/svd/STM32F103.svd").unwrap().read_to_string(xml).unwrap();
 
     let f = svd::parse(xml).unwrap();
     generate(&f.peripherals);
